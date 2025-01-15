@@ -1,0 +1,24 @@
+# Interactive Thonny Terminal Test
+# Joe Pardue 1/15/25
+
+import time
+
+# Function to ask for input and respond
+def terminal_interaction():
+    while True:
+        try:
+            # Prompt user for input
+            user_input = input("Enter text: ")
+            
+            # Respond with the input
+            print(f"I got: {user_input}")
+        except KeyboardInterrupt:
+            print("Exiting interaction.")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
+            break
+
+# Main loop
+if __name__ == "__main__":
+    terminal_interaction()
