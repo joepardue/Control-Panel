@@ -1,0 +1,53 @@
+# Interactive Thonny Terminal Test with OLED
+# Joe Pardue 1/15/25
+
+import time
+import board
+from adafruit_ssd1306 import SSD1306_I2C
+
+# Define the OLED display parameters
+OLED_WIDTH = 128
+OLED_HEIGHT = 64
+
+i2c = board.STEMMA_I2C()
+
+# Create an SSD1306 I2C instance for the display
+display = SSD1306_I2C(OLED_WIDTH, OLED_HEIGHT, i2c, addr=0x3d)
+
+# Clear the display initially
+display.fill(0)
+display.show()
+
+# Function to display text on the OLED
+def display_on_oled(text):
+    display.fill(0)  # Clear display
+    lines = text.split("\n")
+    y_offset = 0  # Start at the top
+    for line in lines[:8]:  # Display up to 8 lines of text
+        display.text(line, 0, y_offset, 1)
+        y_offset += 8
+    display.show()  # Update the display
+
+# Function to ask for input and respond
+def terminal_interaction():
+    while True:
+        try:
+            # Prompt user for input
+            user_input = input("Enter text: ")
+            
+            # Respond with the input
+            response = f"I got: {user_input}"
+            print(response)
+            
+            # Display the response on the OLED
+            display_on_oled(response)
+        except KeyboardInterrupt:
+            print("Exiting interaction.")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
+            break
+
+# Main loop
+if __name__ == "__main__":
+    terminal_interaction()
