@@ -1,0 +1,49 @@
+# Simple MDNS example
+# Joe Pardue 1/15/25
+
+import time
+import wifi
+import socketpool
+from adafruit_httpserver import Server, Request, Response
+from secrets import secrets
+
+# --- Connect to Wi-Fi ---
+print("Connecting to Wi-Fi...")
+wifi.radio.connect(secrets["ssid"], secrets["password"])
+ip_address = str(wifi.radio.ipv4_address)
+print(f"Connected to Wi-Fi! IP Address: {ip_address}")
+
+# --- Set Up mDNS ---
+try:
+    from mdns import Server as MDNSServer
+    mdns_server = MDNSServer(wifi.radio)
+    mdns_server.hostname = "pico"
+    mdns_server.advertise_service(service_type="_http", protocol="_tcp", port=80)
+    print("mDNS hostname set to: pico.local")
+except ImportError:
+    print("mDNS is not available in your CircuitPython version.")
+except Exception as e:
+    print(f"Error with mDNS setup: {e}")
+
+
+
+
+# --- Set Up HTTP Server ---
+pool = socketpool.SocketPool(wifi.radio)
+server = Server(pool)
+
+@server.route("/")
+def index(request: Request):
+    return Response(request, "Hello, World!", content_type="text/plain")
+
+# --- Start the Server ---
+print("Starting server...")
+server.start(ip_address, port=80)
+
+# --- Keep the Server Running ---
+while True:
+    try:
+        server.poll()
+    except Exception as e:
+        print("Error:", e)
+        time.sleep(1)
