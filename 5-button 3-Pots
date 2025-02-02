@@ -1,11 +1,15 @@
-# Five-Button Control with Display
+# Five-Button and 3-Pot Control with Display
 # Joe Pardue 2/1/25
 
 # Modified from Eight-Button Control with Display
 # Joe Pardue 1/4/25 (Modified for internal pull-ups)
 
+# Five-Button + Potentiometer Control with Display
+# Joe Pardue 2/1/25
+
 import board
 import digitalio
+import analogio
 import time
 from adafruit_ssd1306 import SSD1306_I2C
 
@@ -17,6 +21,7 @@ BUTTON_PINS = [
     board.GP9,  # Button 4
     board.GP10, # Button 5
 ]
+POT_PIN = board.A0  # Potentiometer (ADC0)
 LED_PIN = board.LED  # Onboard LED
 
 # Set up buttons as inputs with pull-up resistors
@@ -26,6 +31,9 @@ for pin in BUTTON_PINS:
     button.direction = digitalio.Direction.INPUT
     button.pull = digitalio.Pull.UP  # Use internal pull-ups
     buttons.append(button)
+
+# Set up the potentiometer
+potentiometer = analogio.AnalogIn(POT_PIN)
 
 # Set up the onboard LED as an output
 led = digitalio.DigitalInOut(LED_PIN)
@@ -39,28 +47,62 @@ display = SSD1306_I2C(128, 64, i2c, addr=0x3D)
 display.fill(0)
 display.show()
 
-# Store previous button states to minimize display updates
-prev_states = [None] * len(BUTTON_PINS)
+# Calibration values
+calibration_min = 0
+calibration_max = 65535
+is_calibrated = False
 
-# Function to update the display only when necessary
-def update_display(states):
-    global prev_states
-    if states != prev_states:  # Update only if states have changed
+# Store previous button states and potentiometer value
+prev_button_states = [None] * len(BUTTON_PINS)
+prev_pot_value = None
+
+# Function to read and map the potentiometer value
+def read_potentiometer():
+    raw_value = potentiometer.value
+    if is_calibrated:
+        return int((raw_value - calibration_min) * 4095 / (calibration_max - calibration_min))
+    else:
+        return raw_value >> 4  # Default scaled value (0-4095 12-bit true range)
+
+# Function to update display only if values have changed
+def update_display(button_states, pot_value):
+    global prev_button_states, prev_pot_value
+
+    if button_states != prev_button_states or pot_value != prev_pot_value:
         display.fill(0)  # Clear display
-        for i, state in enumerate(states):
-            y_offset = i * 5  # Move to the next line
-            display.text(f"Btn {i+1}: {'Released' if not state else 'Pressed'}", 0, y_offset, 1)
+
+        # Display button states
+        for i, state in enumerate(button_states):
+            y_offset = i * 10  # Line spacing
+            display.text(f"Btn {i+1}: {'Pressed' if state else 'Released'}", 0, y_offset, 1)
+
+        # Display potentiometer value
+        display.text(f"Pot = {pot_value:04}", 0, 55, 1)  # Adjust Y position for visibility
+
         display.show()  # Update the display
-        prev_states = states[:]  # Save the current states
+        prev_button_states = button_states[:]  # Save button states
+        prev_pot_value = pot_value  # Save potentiometer value
 
 # Main loop
 while True:
     # Read all button states (invert logic since pull-ups are active)
     button_states = [not button.value for button in buttons]
 
-    # Update display only if states have changed
-    update_display(button_states)
+    # Read potentiometer value
+    pot_value = read_potentiometer()
 
-    # Minimal delay to reduce CPU load without impacting responsiveness
-    time.sleep(0.005)  # 5 ms delay
+    # Check button presses for calibration
+    if button_states[0]:  # Button 1: Set Max
+        calibration_max = potentiometer.value
+        is_calibrated = calibration_min < calibration_max
+        time.sleep(0.2)  # Debounce
 
+    if button_states[1]:  # Button 2: Set Min
+        calibration_min = potentiometer.value
+        is_calibrated = calibration_min < calibration_max
+        time.sleep(0.2)  # Debounce
+
+    # Update display if values changed
+    update_display(button_states, pot_value)
+
+    time.sleep(0.1)  # Update every 100 ms
